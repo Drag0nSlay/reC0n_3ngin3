@@ -1,0 +1,76 @@
+# reC0n_3ngin3/config/settings.yaml
+# ------------------------------------------------------------------
+# Fill in API keys / tokens before running. Anything left blank is
+# skipped automatically (module degrades gracefully, doesn't crash).
+# ------------------------------------------------------------------
+
+target:
+  domain: "target.com"          # root domain / org to enumerate
+  authorized: false               # MUST be set true to run anything.
+                                   # This is a hard safety gate — see main.py
+
+api_keys:
+  virustotal: ""                  # https://www.virustotal.com/gui/my-apikey
+  chaos: ""                       # https://chaos.projectdiscovery.io/
+  github_token: ""                # personal access token, "public_repo" scope only
+  securitytrails: ""               # optional, extra passive source
+  shodan: ""                       # https://account.shodan.io/
+
+paths:
+  # Leave as bare command names if the binaries are on $PATH.
+  # These are third-party OSS tools you install yourself:
+  #   subfinder, assetfinder, amass, shuffledns, asnmap, mapcidr, puredns
+  subfinder: "subfinder"
+  assetfinder: "assetfinder"
+  amass: "amass"
+  shuffledns: "shuffledns"
+  asnmap: "asnmap"
+  mapcidr: "mapcidr"
+  resolvers_list: "config/resolvers.txt"   # used by shuffledns brute step
+  dnsx: "dnsx"
+  httpx: "httpx"
+  naabu: "naabu"
+  rustscan: "rustscan"
+  masscan: "masscan"
+  nmap: "nmap"
+  waybackurls: "waybackurls"
+  gau: "gau"
+  katana: "katana"
+  linkfinder: "linkfinder"        # e.g. path to LinkFinder's linkfinder.py, or a shim script
+  secretfinder: "secretfinder"    # same idea for SecretFinder.py
+  mantra: "mantra"
+  gitgraber: "gitgraber"
+  gitdorker: "gitdorker"
+  trufflehog: "trufflehog"
+  wafw00f: "wafw00f"
+  nuclei: "nuclei"
+  gf: "gf"
+  subzy: "subzy"
+  ffuf: "ffuf"
+  dirsearch: "dirsearch"
+  eyewitness: "eyewitness"
+  lazys3: "lazys3"
+  s3scanner: "s3scanner"
+  dnsrecon: "dnsrecon"
+  resolvers_wordlist: "config/wordlists/directories.txt"   # for ffuf/dirsearch, not bundled
+
+scan:
+  naabu_top_ports: 1000
+  nmap_max_high_value_hosts: 50   # cap on Step 7 to keep -sV -sC runtime sane
+  nuclei_severity: "info,low"     # Step 15: "safe templates only" — no exploit/intrusive tags
+  nuclei_exclude_tags: "dos,fuzz,intrusive"
+
+
+concurrency:
+  max_workers: 8            # thread pool size for passive-source fan-out
+  http_timeout: 15          # seconds per HTTP request
+  rate_limit_per_host: 5    # max concurrent requests to a single API host
+
+output:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  db_path: "data/processed/recon.sqlite3"
+
+logging:
+  level: "INFO"
+  file: "data/recon.log"

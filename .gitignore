@@ -1,0 +1,14 @@
+# Secrets — kabhi commit mat karna
+config/settings.yaml
+
+# Scan data — kisi real target ka data leak ho sakta hai
+data/raw/*
+data/processed/*
+*.sqlite3
+*.log
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
