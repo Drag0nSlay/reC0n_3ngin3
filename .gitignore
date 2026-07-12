@@ -1,7 +1,7 @@
-# Secrets — kabhi commit mat karna
+# Secrets
 config/settings.yaml
 
-# Scan data — kisi real target ka data leak ho sakta hai
+# Scan data
 data/raw/*
 data/processed/*
 *.sqlite3
