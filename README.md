@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🕵️ reC0n_3ngin3
+# 🕵️ recon-engine
 
 **A tiered, orchestrated reconnaissance pipeline — from passive OSINT to prioritized findings, in one command.**
 
@@ -15,7 +15,7 @@
 
 ## ⚡ What it does
 
-`reC0n_3ngin3` wraps the tools you already trust — `subfinder`, `httpx`,
+`recon-engine` wraps the tools you already trust — `subfinder`, `httpx`,
 `naabu`, `nmap`, `nuclei`, `katana`, `subzy`, and more — into a single
 **14-phase orchestrated pipeline**:
 
@@ -26,7 +26,9 @@ Scoring → Storage → Prioritized Report
 ```
 
 No more juggling a dozen terminal tabs and manually merging text files.
-One command in, one prioritized report out.
+One command in, one prioritized report out — with **color-coded console
+output** so you can tell phases and severity apart at a glance (auto
+disables when output is piped/redirected to a file).
 
 ## 🎯 Tiered execution
 
@@ -62,8 +64,8 @@ responsible for how you use this tool.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<your-username>/reC0n_3ngin3.git
-cd reC0n_3ngin3
+git clone https://github.com/<your-username>/recon-engine.git
+cd recon-engine
 
 cp config/settings.example.yaml config/settings.yaml
 # edit config/settings.yaml → add your API keys + target domain
@@ -75,6 +77,11 @@ python main.py --config config/settings.yaml --tier 1
 
 > `config/settings.yaml` is gitignored — never commit real API keys or
 > `authorized: true`.
+
+> **Kali users:** the `httpx` binary name clashes with Python's `httpx`
+> package in Kali's repos. Install ProjectDiscovery's version as
+> `httpx-toolkit` (`sudo apt install -y httpx-toolkit`) and set
+> `paths.httpx: "httpx-toolkit"` in `settings.yaml`.
 
 ## 📂 What you get
 
@@ -126,6 +133,10 @@ This tool is still under active development. If you run into a bug, a
 tool wrapper that doesn't match your installed version's flags, or a
 missing feature — feel free to open an issue or a PR. Contributions are
 welcome, big or small.
+
+**Recently fixed:** `scan.naabu_top_ports` in `settings.yaml` wasn't
+actually being passed through to the naabu scan call (always used a
+hardcoded default regardless of config) — now wired correctly.
 
 ## 📄 License
 

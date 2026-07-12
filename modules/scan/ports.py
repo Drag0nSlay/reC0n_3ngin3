@@ -183,7 +183,7 @@ def run_port_scan_stage(cfg: Config, hosts: Iterable[str]) -> Set[str]:
     subset naabu flagged. masscan is NOT called here automatically;
     invoke masscan_ranges() directly if you need large-range coverage.
     """
-    naabu_results = naabu_scan(cfg, hosts)
+    naabu_results = naabu_scan(cfg, hosts, top_ports=cfg.naabu_top_ports)
 
     interesting_hosts = sorted({r.split(":")[0] for r in naabu_results})
     rustscan_results = rustscan_confirm(cfg, interesting_hosts) if interesting_hosts else set()
