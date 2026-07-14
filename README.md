@@ -64,7 +64,7 @@ responsible for how you use this tool.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<your-username>/recon-engine.git
+git clone https://github.com/Drag0nSlay/recon-engine.git
 cd recon-engine
 
 cp config/settings.example.yaml config/settings.yaml
