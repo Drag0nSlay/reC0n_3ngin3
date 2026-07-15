@@ -64,7 +64,7 @@ responsible for how you use this tool.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<your-username>/reC0n_3ngin3.git
+git clone https://github.com/Drag0nSlay/reC0n_3ngin3.git
 cd reC0n_3ngin3
 
 cp config/settings.example.yaml config/settings.yaml
