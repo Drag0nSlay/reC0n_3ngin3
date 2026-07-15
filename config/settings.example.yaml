@@ -1,4 +1,4 @@
-# recon-engine/config/settings.yaml
+# reC0n_3ngin3/config/settings.yaml
 # ------------------------------------------------------------------
 # Fill in API keys / tokens before running. Anything left blank is
 # skipped automatically (module degrades gracefully, doesn't crash).

@@ -60,7 +60,7 @@ def _redact(match: str, keep: int = 4) -> str:
 
 def _fetch_js(url: str, timeout: int) -> str:
     try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0 (recon-engine)"})
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0 (reC0n_3ngin3)"})
         r.raise_for_status()
         return r.text
     except Exception as e:

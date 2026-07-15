@@ -247,7 +247,7 @@ def _write_markdown_report(cfg: Config, report: dict) -> None:
 
 
 def main():
-    p = argparse.ArgumentParser(description="Combine all recon-engine phase outputs into one report")
+    p = argparse.ArgumentParser(description="Combine all reC0n_3ngin3 phase outputs into one report")
     p.add_argument("--config", default="config/settings.yaml")
     args = p.parse_args()
 

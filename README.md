@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🕵️ recon-engine
+# 🕵️ reC0n_3ngin3
 
 **A tiered, orchestrated reconnaissance pipeline — from passive OSINT to prioritized findings, in one command.**
 
@@ -15,7 +15,7 @@
 
 ## ⚡ What it does
 
-`recon-engine` wraps the tools you already trust — `subfinder`, `httpx`,
+`reC0n_3ngin3` wraps the tools you already trust — `subfinder`, `httpx`,
 `naabu`, `nmap`, `nuclei`, `katana`, `subzy`, and more — into a single
 **14-phase orchestrated pipeline**:
 
@@ -64,8 +64,8 @@ responsible for how you use this tool.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<your-username>/recon-engine.git
-cd recon-engine
+git clone https://github.com/<your-username>/reC0n_3ngin3.git
+cd reC0n_3ngin3
 
 cp config/settings.example.yaml config/settings.yaml
 # edit config/settings.yaml → add your API keys + target domain

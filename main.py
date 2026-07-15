@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py — recon-engine entrypoint (Phases 1-14 implemented).
+main.py — reC0n_3ngin3 entrypoint (Phases 1-14 implemented).
 
 Primary interface — tiered execution (Phase 14, recommended):
     python main.py --config config/settings.yaml --tier 1
@@ -56,7 +56,7 @@ from utils.logger import setup_logging, get_logger
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="recon-engine — Phases 1-14")
+    p = argparse.ArgumentParser(description="reC0n_3ngin3 — Phases 1-14")
     p.add_argument("--config", default="config/settings.yaml")
     p.add_argument("--wordlist", default=None, help="Wordlist for brute-force DNS expansion (Step 3)")
     p.add_argument("--dir-wordlist", default=None, help="Wordlist for ffuf directory bruteforce (Step 18)")

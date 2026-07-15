@@ -67,7 +67,7 @@ def bgp_he_net(cfg: Config, asn_or_org: str) -> Set[str]:
     try:
         r = requests.get(
             url, timeout=cfg.http_timeout,
-            headers={"User-Agent": "Mozilla/5.0 (recon-engine)"}
+            headers={"User-Agent": "Mozilla/5.0 (reC0n_3ngin3)"}
         )
         r.raise_for_status()
         # crude CIDR extraction — works regardless of exact HTML structure
