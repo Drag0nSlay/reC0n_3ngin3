@@ -38,7 +38,7 @@ def dnsrecon_scan(cfg: Config, timeout: int = 600) -> str:
         return ""
 
     binary = cfg.tool_path("dnsrecon") if hasattr(cfg, "tool_path") else "dnsrecon"
-    args = ["-d", cfg.domain, "-a"]  # -a: perform AXFR (zone transfer) attempts too
+    args = ["-d", cfg.domain, "-a"] + cfg.extra_args("dnsrecon")  # -a: perform AXFR (zone transfer) attempts too
 
     try:
         proc = subprocess.run([binary, *args], capture_output=True, text=True, timeout=timeout)
@@ -58,7 +58,7 @@ def amass_active(cfg: Config, timeout: int = 1800) -> str:
         return ""
 
     binary = cfg.tool_path("amass") if hasattr(cfg, "tool_path") else "amass"
-    args = ["enum", "-active", "-d", cfg.domain]
+    args = ["enum", "-active", "-d", cfg.domain] + cfg.extra_args("amass")
 
     try:
         proc = subprocess.run([binary, *args], capture_output=True, text=True, timeout=timeout)

@@ -21,10 +21,10 @@ log = get_logger("intel.gf")
 DEFAULT_PATTERNS = ["xss", "sqli", "redirect", "ssrf", "lfi", "idor"]
 
 
-def _run_gf(binary: str, pattern: str, stdin_data: str, timeout: int = 60) -> str:
+def _run_gf(cfg: Config, binary: str, pattern: str, stdin_data: str, timeout: int = 60) -> str:
     try:
         proc = subprocess.run(
-            [binary, pattern], input=stdin_data,
+            [binary, pattern] + cfg.extra_args("gf"), input=stdin_data,
             capture_output=True, text=True, timeout=timeout,
         )
         return proc.stdout
@@ -48,7 +48,7 @@ def gf_scan(cfg: Config, urls: Iterable[str], patterns: List[str] | None = None)
 
     results: dict[str, List[str]] = {}
     for pattern in patterns:
-        out = _run_gf(binary, pattern, stdin_data)
+        out = _run_gf(cfg, binary, pattern, stdin_data)
         lines = [l.strip() for l in out.splitlines() if l.strip()]
         if lines:
             results[pattern] = lines

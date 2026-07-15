@@ -61,6 +61,40 @@ def _authorized_or_bail(cfg: Config) -> bool:
 
 
 # ------------------------------------------------------------------ naabu --
+# ------------------------------------------------------------------ naabu --
+def naabu_passive_scan(cfg: Config, hosts: Iterable[str]) -> Set[str]:
+    """
+    naabu -passive pulls port data from Shodan's free InternetDB API
+    (no API key needed) instead of scanning the target directly — zero
+    packets sent to the target. Deliberately NOT gated on cfg.authorized,
+    same reasoning as the Shodan module: it's a third-party data lookup,
+    not a scan. Useful as a lighter-weight Tier 1/2 signal, or as a
+    sanity check to compare against naabu_scan()'s active results.
+    """
+    hosts = list(hosts)
+    if not hosts:
+        log.warning("naabu_passive_scan called with empty host list")
+        return set()
+
+    binary = cfg.tool_path("naabu")
+    args = ["-silent", "-passive", "-json"] + cfg.extra_args("naabu")
+    out = _run_cli(binary, args, stdin_data="\n".join(hosts), timeout=300)
+
+    results: Set[str] = set()
+    for line in out.splitlines():
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        host = obj.get("host") or obj.get("ip")
+        port = obj.get("port")
+        if host and port:
+            results.add(f"{host}:{port}")
+
+    log.info(f"naabu -passive: {len(results)} host:port pairs from Shodan InternetDB (no target traffic)")
+    return results
+
+
 def naabu_scan(cfg: Config, hosts: Iterable[str], top_ports: int = 1000) -> Set[str]:
     """Fast top-ports sweep. Input: bare hostnames or IPs (not URLs)."""
     if not _authorized_or_bail(cfg):
@@ -72,7 +106,7 @@ def naabu_scan(cfg: Config, hosts: Iterable[str], top_ports: int = 1000) -> Set[
         return set()
 
     binary = cfg.tool_path("naabu")
-    args = ["-silent", "-top-ports", str(top_ports), "-json"]
+    args = ["-silent", "-top-ports", str(top_ports), "-json"] + cfg.extra_args("naabu")
     out = _run_cli(binary, args, stdin_data="\n".join(hosts), timeout=900)
 
     results: Set[str] = set()
@@ -110,7 +144,7 @@ def rustscan_confirm(cfg: Config, hosts: Iterable[str]) -> Set[str]:
     for host in hosts:
         out = _run_cli(
             binary,
-            ["-a", host, "--ulimit", "5000", "-g"],  # -g = greppable output
+            ["-a", host, "--ulimit", "5000", "-g"] + cfg.extra_args("rustscan"),  # -g = greppable output
             timeout=300,
         )
         for line in out.splitlines():
@@ -163,7 +197,7 @@ def masscan_ranges(cfg: Config, cidrs: Iterable[str], ports: str = "1-65535",
     for cidr in cidrs:
         out = _run_cli(
             binary,
-            [cidr, "-p", ports, "--rate", str(rate), "-oL", "-"],
+            [cidr, "-p", ports, "--rate", str(rate), "-oL", "-"] + cfg.extra_args("masscan"),
             timeout=1800,
         )
         for line in out.splitlines():
@@ -179,17 +213,26 @@ def masscan_ranges(cfg: Config, cidrs: Iterable[str], ports: str = "1-65535",
 
 def run_port_scan_stage(cfg: Config, hosts: Iterable[str]) -> Set[str]:
     """
-    Default cascade for Step 6: naabu sweep -> rustscan confirm on the
-    subset naabu flagged. masscan is NOT called here automatically;
-    invoke masscan_ranges() directly if you need large-range coverage.
+    Default cascade for Step 6: naabu -passive (Shodan InternetDB, zero
+    target traffic) supplements naabu active sweep -> rustscan confirm
+    on the subset naabu flagged. masscan is NOT called here
+    automatically; invoke masscan_ranges() directly if you need large-
+    range coverage.
     """
+    hosts = list(hosts)
+    passive_results = naabu_passive_scan(cfg, hosts)
+
     naabu_results = naabu_scan(cfg, hosts, top_ports=cfg.naabu_top_ports)
 
     interesting_hosts = sorted({r.split(":")[0] for r in naabu_results})
     rustscan_results = rustscan_confirm(cfg, interesting_hosts) if interesting_hosts else set()
 
-    merged = naabu_results | rustscan_results
+    merged = passive_results | naabu_results | rustscan_results
     out_path = os.path.join(cfg.processed_dir, "ports.txt")
     save_set(out_path, merged, )
-    log.info(f"Port scan stage complete: {len(merged)} unique host:port pairs -> {out_path}")
+    log.info(
+        f"Port scan stage complete: {len(merged)} unique host:port pairs "
+        f"({len(passive_results)} passive-only, {len(naabu_results)} active naabu, "
+        f"{len(rustscan_results)} rustscan-confirmed) -> {out_path}"
+    )
     return merged

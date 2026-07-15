@@ -120,9 +120,9 @@ def analyze_js_files(cfg: Config, js_urls: Iterable[str]) -> dict:
         # Try external tools if present (best-effort; they may expect a
         # temp file or different invocation style depending on version —
         # adjust args to match your installed forks).
-        lf_out = _run_external_tool(linkfinder_bin, ["-i", url, "-o", "cli"])
-        sf_out = _run_external_tool(secretfinder_bin, ["-i", url, "-o", "cli"])
-        mantra_out = _run_external_tool(mantra_bin, [url])
+        lf_out = _run_external_tool(linkfinder_bin, ["-i", url, "-o", "cli"] + cfg.extra_args("linkfinder"))
+        sf_out = _run_external_tool(secretfinder_bin, ["-i", url, "-o", "cli"] + cfg.extra_args("secretfinder"))
+        mantra_out = _run_external_tool(mantra_bin, [url] + cfg.extra_args("mantra"))
 
         for line in (lf_out + "\n" + mantra_out).splitlines():
             line = line.strip()

@@ -1,15 +1,24 @@
-# Secrets — kabhi commit mat karna
+# Secrets — never commit real API keys or authorized: true
 config/settings.yaml
 
-# Scan data — kisi real target ka data leak ho sakta hai
+# Scan output
 data/raw/*
 data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
 *.sqlite3
 *.log
-.vscode/
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
 venv/
+.venv/
 .env
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/

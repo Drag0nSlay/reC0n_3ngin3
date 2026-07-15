@@ -59,7 +59,7 @@ def ffuf_scan(cfg: Config, high_priority_urls: Iterable[str], wordlist_path: str
 
     for url in urls:
         target = url.rstrip("/") + "/FUZZ"
-        args = ["-u", target, "-w", wordlist_path, "-rate", str(rate), "-s"]  # -s: silent, only matches
+        args = ["-u", target, "-w", wordlist_path, "-rate", str(rate), "-s"] + cfg.extra_args("ffuf")  # -s: silent, only matches
         if extensions:
             args += ["-e", extensions]
         try:
@@ -95,7 +95,7 @@ def dirsearch_scan(cfg: Config, high_priority_urls: Iterable[str], extensions: s
     results: List[str] = []
 
     for url in urls:
-        args = ["-u", url, "-e", extensions, "--format", "plain", "-q"]
+        args = ["-u", url, "-e", extensions, "--format", "plain", "-q"] + cfg.extra_args("dirsearch")
         try:
             proc = subprocess.run([binary, *args], capture_output=True, text=True, timeout=timeout_per_host)
             if proc.returncode not in (0, 1):

@@ -13,6 +13,11 @@ Sources implemented:
   - subfinder / assetfinder / amass (passive mode) — CLI wrappers, optional binaries
 
 All results are normalized + deduped via utils.dedupe before returning.
+
+Every source function accepts an optional `domain` override (defaults to
+cfg.domain) and `prefix` for the raw output filename — this lets
+modules.enum.recursive_enum re-run the same trusted sources against a
+discovered sub-root without clobbering the primary run's raw files.
 """
 
 from __future__ import annotations
@@ -31,15 +36,16 @@ from core.config import Config
 log = get_logger("enum.passive")
 
 
-def _write_raw(cfg: Config, name: str, domains: Set[str]) -> None:
-    path = os.path.join(cfg.raw_dir, f"{name}.txt")
+def _write_raw(cfg: Config, name: str, domains: Set[str], prefix: str = "") -> None:
+    fname = f"{prefix}{name}.txt" if prefix else f"{name}.txt"
+    path = os.path.join(cfg.raw_dir, fname)
     save_set(path, domains)
     log.info(f"{name}: {len(domains)} domains -> {path}")
 
 
 # ---------------------------------------------------------------- crt.sh ----
-def crtsh(cfg: Config) -> Set[str]:
-    domain = cfg.domain
+def crtsh(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
+    domain = domain or cfg.domain
     url = f"https://crt.sh/?q=%25.{domain}&output=json"
     try:
         r = requests.get(url, timeout=cfg.http_timeout)
@@ -56,18 +62,18 @@ def crtsh(cfg: Config) -> Set[str]:
 
     result = dedupe_lines(names)
     result = {d for d in result if d.endswith(domain)}
-    _write_raw(cfg, "crtsh", result)
+    _write_raw(cfg, "crtsh", result, prefix)
     return result
 
 
 # ------------------------------------------------------------ VirusTotal ----
-def virustotal(cfg: Config) -> Set[str]:
+def virustotal(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
     key = cfg.api_key("virustotal")
     if not key:
         log.info("VirusTotal: no API key configured, skipping")
         return set()
 
-    domain = cfg.domain
+    domain = domain or cfg.domain
     out: Set[str] = set()
     url = f"https://www.virustotal.com/api/v3/domains/{domain}/subdomains"
     headers = {"x-apikey": key}
@@ -87,18 +93,18 @@ def virustotal(cfg: Config) -> Set[str]:
         log.warning(f"VirusTotal failed: {e}")
 
     out = dedupe_lines(out)
-    _write_raw(cfg, "virustotal", out)
+    _write_raw(cfg, "virustotal", out, prefix)
     return out
 
 
 # ----------------------------------------------------------------- Chaos ----
-def chaos(cfg: Config) -> Set[str]:
+def chaos(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
     key = cfg.api_key("chaos")
     if not key:
         log.info("Chaos: no API key configured, skipping")
         return set()
 
-    domain = cfg.domain
+    domain = domain or cfg.domain
     url = f"https://dns.projectdiscovery.io/dns/{domain}/subdomains"
     headers = {"Authorization": key}
 
@@ -113,12 +119,12 @@ def chaos(cfg: Config) -> Set[str]:
         return set()
 
     out = dedupe_lines(out)
-    _write_raw(cfg, "chaos", out)
+    _write_raw(cfg, "chaos", out, prefix)
     return out
 
 
 # -------------------------------------------------------- GitHub search ----
-def github_subdomains(cfg: Config) -> Set[str]:
+def github_subdomains(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
     """
     Greps public GitHub code search for literal subdomain mentions.
     Cheap, high-signal source for internal/staging hosts leaked in configs.
@@ -128,7 +134,7 @@ def github_subdomains(cfg: Config) -> Set[str]:
         log.info("GitHub: no token configured, skipping")
         return set()
 
-    domain = cfg.domain
+    domain = domain or cfg.domain
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
     query = f'"{domain}"'
     url = "https://api.github.com/search/code"
@@ -151,7 +157,7 @@ def github_subdomains(cfg: Config) -> Set[str]:
         log.warning(f"GitHub search failed: {e}")
 
     out = dedupe_lines(out)
-    _write_raw(cfg, "github", out)
+    _write_raw(cfg, "github", out, prefix)
     return out
 
 
@@ -172,27 +178,64 @@ def _run_cli(binary: str, args: list[str], timeout: int = 120) -> str:
         return ""
 
 
-def subfinder(cfg: Config) -> Set[str]:
+def subfinder(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
+    domain = domain or cfg.domain
     binary = cfg.tool_path("subfinder")
-    out = _run_cli(binary, ["-d", cfg.domain, "-silent", "-all"])
+    out = _run_cli(binary, ["-d", domain, "-silent", "-all"] + cfg.extra_args("subfinder"))
     result = dedupe_lines(out.splitlines())
-    _write_raw(cfg, "subfinder", result)
+    _write_raw(cfg, "subfinder", result, prefix)
     return result
 
 
-def assetfinder(cfg: Config) -> Set[str]:
+def assetfinder(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
+    domain = domain or cfg.domain
     binary = cfg.tool_path("assetfinder")
-    out = _run_cli(binary, ["--subs-only", cfg.domain])
+    out = _run_cli(binary, ["--subs-only", domain] + cfg.extra_args("assetfinder"))
     result = dedupe_lines(out.splitlines())
-    _write_raw(cfg, "assetfinder", result)
+    _write_raw(cfg, "assetfinder", result, prefix)
     return result
 
 
-def amass_passive(cfg: Config) -> Set[str]:
+def amass_passive(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
+    domain = domain or cfg.domain
     binary = cfg.tool_path("amass")
-    out = _run_cli(binary, ["enum", "-passive", "-d", cfg.domain], timeout=300)
+    out = _run_cli(binary, ["enum", "-passive", "-d", domain] + cfg.extra_args("amass"), timeout=300)
     result = dedupe_lines(out.splitlines())
-    _write_raw(cfg, "amass", result)
+    _write_raw(cfg, "amass", result, prefix)
+    return result
+
+
+def amass_intel_org(cfg: Config, org_name: str | None = None) -> Set[str]:
+    """
+    `amass intel -org "Org Name"` — a genuinely different discovery mode
+    from amass enum: instead of enumerating subdomains of ONE root
+    domain, it searches WHOIS/registry data for everything registered
+    under an organization's name, surfacing ASNs and netblocks the org
+    owns — which may point to entirely separate root domains you'd
+    otherwise miss.
+
+    Important: this does NOT return subdomains directly, so its output
+    is written to a separate org_intel.txt file rather than merged into
+    final_subdomains.txt — treat it as a lead to manually pivot from
+    (e.g. feed a newly discovered root domain back into this pipeline
+    as its own target.domain run), not as confirmed pipeline output.
+
+    Requires target.org_name in settings.yaml (falls back to cfg.domain's
+    registrable name if not set, which is a weaker guess).
+    """
+    org_name = org_name or cfg.org_name or cfg.domain.split(".")[0]
+    binary = cfg.tool_path("amass")
+    out = _run_cli(binary, ["intel", "-org", org_name] + cfg.extra_args("amass"), timeout=300)
+
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    result = set(lines)
+
+    out_path = os.path.join(cfg.raw_dir, "org_intel.txt")
+    save_set(out_path, result)
+    log.info(
+        f"amass intel -org '{org_name}': {len(result)} raw ASN/netblock/whois lines -> {out_path} "
+        f"(NOT auto-merged into subdomains — review manually)"
+    )
     return result
 
 
@@ -207,24 +250,62 @@ ALL_SOURCES = {
     "amass": amass_passive,
 }
 
+# Fast, API-only sources (no slow/timeout-prone CLI binaries) — used by
+# recursive_enum so recursing into N sub-roots doesn't spend 5+ minutes
+# per sub-root waiting on amass/subfinder.
+FAST_SOURCES = {
+    "crtsh": crtsh,
+    "virustotal": virustotal,
+    "chaos": chaos,
+}
 
-def run_all_passive(cfg: Config, max_workers: int | None = None) -> Set[str]:
-    """Fan out all passive sources concurrently (principle #4), merge + dedupe."""
+
+def run_all_passive(
+    cfg: Config,
+    max_workers: int | None = None,
+    domain: str | None = None,
+    prefix: str = "",
+    sources: dict | None = None,
+) -> Set[str]:
+    """Fan out passive sources concurrently (principle #4), merge + dedupe.
+
+    domain: override cfg.domain (used for recursive enumeration sub-roots)
+    prefix: namespaces raw output filenames so recursive runs don't
+            overwrite the primary run's data/raw/*.txt files
+    sources: which source functions to run — defaults to ALL_SOURCES;
+             recursive_enum passes FAST_SOURCES to keep sub-root
+             recursion fast
+    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     workers = max_workers or cfg.max_workers
+    sources = sources or ALL_SOURCES
     merged: Set[str] = set()
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(fn, cfg): name for name, fn in ALL_SOURCES.items()}
+    # NOTE: plain `with ThreadPoolExecutor(...) as pool:` blocks on Ctrl+C —
+    # the context manager's __exit__ calls shutdown(wait=True) unconditionally,
+    # so pressing Ctrl+C appears to "not work" until every in-flight thread
+    # (a slow HTTP request, a subprocess with a multi-minute timeout) finishes
+    # on its own. Handling KeyboardInterrupt explicitly and cancelling
+    # pending futures makes Ctrl+C actually stop the run promptly.
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
+        futures = {pool.submit(fn, cfg, domain, prefix): name for name, fn in sources.items()}
         for fut in as_completed(futures):
             name = futures[fut]
             try:
                 merged |= fut.result()
             except Exception as e:
                 log.warning(f"Source {name} raised: {e}")
+    except KeyboardInterrupt:
+        log.warning("Interrupted — cancelling remaining passive-source lookups...")
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    else:
+        pool.shutdown(wait=True)
 
-    out_path = os.path.join(cfg.raw_dir, "all_subdomains_raw.txt")
+    out_name = f"{prefix}all_subdomains_raw.txt" if prefix else "all_subdomains_raw.txt"
+    out_path = os.path.join(cfg.raw_dir, out_name)
     save_set(out_path, merged)
     log.info(f"Passive enumeration total: {len(merged)} unique domains -> {out_path}")
     return merged

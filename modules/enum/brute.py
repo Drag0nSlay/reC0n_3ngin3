@@ -25,6 +25,31 @@ DEFAULT_WORDLIST_URL_HINT = (
 )
 
 
+def combine_wordlists(cfg: Config, *wordlist_paths: str) -> str | None:
+    """
+    Merges any number of wordlist files (labels, one per line — same
+    format shuffledns -w expects) into a single deduped file. Used to
+    combine a user-supplied wordlist with permutation.py's generated
+    candidates before a single shuffledns_brute() call, so DNS
+    resolution/verification happens exactly once for the combined set.
+    Skips paths that don't exist rather than erroring.
+    """
+    merged: Set[str] = set()
+    for path in wordlist_paths:
+        if not path or not os.path.exists(path):
+            continue
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            merged |= {l.strip() for l in f if l.strip()}
+
+    if not merged:
+        return None
+
+    out_path = os.path.join(cfg.raw_dir, "combined_wordlist.txt")
+    save_set(out_path, merged)
+    log.info(f"combined wordlist: {len(merged)} unique labels from {len(wordlist_paths)} source(s) -> {out_path}")
+    return out_path
+
+
 def shuffledns_brute(cfg: Config, wordlist_path: str) -> Set[str]:
     if not cfg.authorized:
         log.error("target.authorized is False in settings.yaml — refusing to brute force. "
@@ -37,7 +62,7 @@ def shuffledns_brute(cfg: Config, wordlist_path: str) -> Set[str]:
 
     binary = cfg.tool_path("shuffledns")
     resolvers = cfg.tool_path("resolvers_list")
-    args = ["-d", cfg.domain, "-w", wordlist_path, "-silent"]
+    args = ["-d", cfg.domain, "-w", wordlist_path, "-silent"] + cfg.extra_args("shuffledns")
     if os.path.exists(resolvers):
         args += ["-r", resolvers]
 

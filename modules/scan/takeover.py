@@ -39,7 +39,7 @@ def subzy_scan(cfg: Config, subdomains: Iterable[str]) -> List[str]:
 
     try:
         proc = subprocess.run(
-            [binary, "run", "--targets", "-", "--hide_fails"],
+            [binary, "run", "--targets", "-", "--hide_fails"] + cfg.extra_args("subzy"),
             input=stdin_data, capture_output=True, text=True, timeout=900,
         )
         if proc.returncode != 0:

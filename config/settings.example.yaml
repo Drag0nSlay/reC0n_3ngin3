@@ -1,13 +1,15 @@
-# reC0n_3ngin3/config/settings.yaml
+# recon-engine/config/settings.yaml
 # ------------------------------------------------------------------
 # Fill in API keys / tokens before running. Anything left blank is
 # skipped automatically (module degrades gracefully, doesn't crash).
 # ------------------------------------------------------------------
 
 target:
-  domain: "target.com"          # root domain / org to enumerate
-  authorized: false               # MUST be set true to run anything.
-                                   # This is a hard safety gate — see main.py
+  domain: "example.com"          # root domain / org to enumerate
+  org_name: ""                    # optional — organization name for amass intel -org
+                                   # (ASN/netblock discovery, may surface other root domains
+                                   # the org owns). Falls back to a guess from domain if blank.
+  authorized: false               # NEVER commit this file with real keys or set to true — use settings.yaml locally
 
 api_keys:
   virustotal: ""                  # https://www.virustotal.com/gui/my-apikey
@@ -51,6 +53,7 @@ paths:
   eyewitness: "eyewitness"
   lazys3: "lazys3"
   s3scanner: "s3scanner"
+  awscli: "aws"
   dnsrecon: "dnsrecon"
   resolvers_wordlist: "config/wordlists/directories.txt"   # for ffuf/dirsearch, not bundled
 
@@ -59,6 +62,60 @@ scan:
   nmap_max_high_value_hosts: 50   # cap on Step 7 to keep -sV -sC runtime sane
   nuclei_severity: "info,low"     # Step 15: "safe templates only" — no exploit/intrusive tags
   nuclei_exclude_tags: "dos,fuzz,intrusive"
+
+
+concurrency:
+  max_workers: 8            # thread pool size for passive-source fan-out
+  http_timeout: 15          # seconds per HTTP request
+  rate_limit_per_host: 5    # max concurrent requests to a single API host
+
+output:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  db_path: "data/processed/recon.sqlite3"
+
+enumeration:
+  # Permutation engine — generates candidate labels from keywords already
+  # found in discovered subdomains + curated terms. Candidates are ONLY
+  # confirmed via real DNS resolution (Step 3, requires authorized: true) —
+  # never written to final_subdomains.txt unverified.
+  permutation_terms: ["dev", "staging", "test", "uat", "qa", "admin",
+                       "internal", "vpn", "api", "beta", "old", "new",
+                       "backup", "prod", "demo", "sandbox", "v1", "v2",
+                       "portal", "gateway", "app", "mobile", "secure", "cdn"]
+  permutation_max_candidates: 3000   # hard cap — avoids DNS-query/wordlist explosion
+
+  # Recursive enumeration — re-runs fast passive sources (crt.sh, VT,
+  # Chaos only — no slow CLI tools) against a curated subset of already
+  # discovered subdomains that look like they might have their own
+  # sub-tree. Depth capped at 1, sub-root count capped.
+  recursion_keywords: ["internal", "corp", "dev", "staging", "vpn",
+                        "admin", "cloud", "aws", "azure", "network",
+                        "office", "test"]
+  recursion_max_subroots: 10
+
+
+concurrency:
+  max_workers: 8            # thread pool size for passive-source fan-out
+  http_timeout: 15          # seconds per HTTP request
+  rate_limit_per_host: 5    # max concurrent requests to a single API host
+
+output:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  db_path: "data/processed/recon.sqlite3"
+
+# Escape hatch: any tool-specific flags/subcommands this pipeline doesn't
+# wire up by default (nmap --script, nuclei -tags, subfinder -recursive,
+# ffuf -mc, etc.) can be added here — appended after this project's own
+# default args for that tool. Empty by default. You are responsible for
+# staying within your authorized scope with anything you add.
+# Example:
+#   extra_args:
+#     nmap: ["-T4", "--script=vuln"]
+#     nuclei: ["-tags", "cve,exposure"]
+#     subfinder: ["-recursive"]
+extra_args: {}
 
 
 concurrency:

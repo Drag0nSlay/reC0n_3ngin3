@@ -43,7 +43,9 @@ def nuclei_safe_scan(cfg: Config, urls: Iterable[str]) -> List[str]:
         "-silent",
         "-severity", cfg.nuclei_severity,
         "-exclude-tags", cfg.nuclei_exclude_tags,
-    ]
+    ] + cfg.extra_args("nuclei")  # NOTE: an explicit extra_args override CAN loosen
+    # severity/tags below — that's a deliberate opt-in escape hatch, not an accident;
+    # see Config.extra_args() docstring.
 
     try:
         proc = subprocess.run(

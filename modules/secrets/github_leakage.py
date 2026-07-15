@@ -92,7 +92,7 @@ def github_code_search(cfg: Config, dorks: List[str] | None = None) -> List[str]
 def gitgraber_scan(cfg: Config, keywords: List[str] | None = None) -> str:
     binary = cfg.tool_path("gitgraber")
     keywords = keywords or [cfg.domain]
-    return _run_cli(binary, ["-k", *keywords])
+    return _run_cli(binary, ["-k", *keywords] + cfg.extra_args("gitgraber"))
 
 
 def gitdorker_scan(cfg: Config) -> str:
@@ -100,13 +100,13 @@ def gitdorker_scan(cfg: Config) -> str:
     token = cfg.api_key("github_token")
     args = ["-tf", token] if token else []
     args += ["-d", cfg.domain]
-    return _run_cli(binary, args)
+    return _run_cli(binary, args + cfg.extra_args("gitdorker"))
 
 
 def trufflehog_scan_repo(cfg: Config, repo_url: str) -> str:
     """Deep-scan a specific repo's git history — run only on repos flagged as relevant."""
     binary = cfg.tool_path("trufflehog")
-    return _run_cli(binary, ["git", repo_url, "--only-verified"], timeout=600)
+    return _run_cli(binary, ["git", repo_url, "--only-verified"] + cfg.extra_args("trufflehog"), timeout=600)
 
 
 def run_github_leakage_stage(cfg: Config, flagged_repos: Iterable[str] | None = None) -> List[str]:

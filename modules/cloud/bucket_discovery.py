@@ -60,7 +60,7 @@ def awscli_bucket_check(cfg: Config, keyword: str | None = None) -> List[str]:
     for name in _candidate_names(keyword):
         try:
             proc = subprocess.run(
-                ["aws", "s3", "ls", f"s3://{name}", "--no-sign-request"],
+                [cfg.tool_path("awscli"), "s3", "ls", f"s3://{name}", "--no-sign-request"] + cfg.extra_args("awscli"),
                 capture_output=True, text=True, timeout=20,
             )
             if proc.returncode == 0:
@@ -83,7 +83,7 @@ def lazys3_scan(cfg: Config, keyword: str | None = None) -> str:
     binary = cfg.tool_path("lazys3") if hasattr(cfg, "tool_path") else "lazys3"
     keyword = keyword or cfg.domain.split(".")[0]
     try:
-        proc = subprocess.run([binary, keyword], capture_output=True, text=True, timeout=300)
+        proc = subprocess.run([binary, keyword] + cfg.extra_args("lazys3"), capture_output=True, text=True, timeout=300)
         return proc.stdout
     except FileNotFoundError:
         log.info("lazys3: not installed, skipping")
@@ -101,7 +101,7 @@ def s3scanner_scan(cfg: Config, keyword: str | None = None) -> str:
     candidates = _candidate_names(keyword)
     try:
         proc = subprocess.run(
-            [binary, "scan", "--bucket-file", "-"],
+            [binary, "scan", "--bucket-file", "-"] + cfg.extra_args("s3scanner"),
             input="\n".join(candidates),
             capture_output=True, text=True, timeout=300,
         )

@@ -37,7 +37,7 @@ def wafw00f_scan(cfg: Config, urls: Iterable[str]) -> List[str]:
     for url in urls:
         try:
             proc = subprocess.run(
-                [binary, url, "-a"], capture_output=True, text=True, timeout=60,
+                [binary, url, "-a"] + cfg.extra_args("wafw00f"), capture_output=True, text=True, timeout=60,
             )
             out = proc.stdout.strip()
             if out:

@@ -41,7 +41,7 @@ def _run_cli(binary: str, args: list[str], stdin_data: str | None = None, timeou
 
 def waybackurls_fetch(cfg: Config) -> Set[str]:
     binary = cfg.tool_path("waybackurls")
-    out = _run_cli(binary, [cfg.domain], timeout=300)
+    out = _run_cli(binary, [cfg.domain] + cfg.extra_args("waybackurls"), timeout=300)
     result = dedupe_lines(out.splitlines(), normalize=False)
     log.info(f"waybackurls: {len(result)} URLs")
     return result
@@ -49,7 +49,7 @@ def waybackurls_fetch(cfg: Config) -> Set[str]:
 
 def gau_fetch(cfg: Config) -> Set[str]:
     binary = cfg.tool_path("gau")
-    out = _run_cli(binary, [cfg.domain], timeout=300)
+    out = _run_cli(binary, [cfg.domain] + cfg.extra_args("gau"), timeout=300)
     result = dedupe_lines(out.splitlines(), normalize=False)
     log.info(f"gau: {len(result)} URLs")
     return result

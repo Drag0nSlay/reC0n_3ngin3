@@ -96,7 +96,7 @@ def _run_cli(binary: str, args: list[str], timeout: int = 60) -> str:
 def asnmap_lookup(cfg: Config) -> Set[str]:
     """Resolve domain -> ASN -> CIDR ranges via asnmap CLI."""
     binary = cfg.tool_path("asnmap")
-    out = _run_cli(binary, ["-d", cfg.domain, "-silent"])
+    out = _run_cli(binary, ["-d", cfg.domain, "-silent"] + cfg.extra_args("asnmap"))
     result = dedupe_lines(out.splitlines(), normalize=False)
     _write_raw(cfg, "asn", result)
     return result
@@ -109,7 +109,7 @@ def mapcidr_expand(cfg: Config, cidrs: Set[str]) -> Set[str]:
         return set()
     try:
         proc = subprocess.run(
-            [binary, "-silent"],
+            [binary, "-silent"] + cfg.extra_args("mapcidr"),
             input="\n".join(sorted(cidrs)),
             capture_output=True, text=True, timeout=120,
         )

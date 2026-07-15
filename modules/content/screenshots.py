@@ -41,7 +41,7 @@ def eyewitness_capture(cfg: Config, urls: Iterable[str], timeout: int = 1800) ->
         f.write("\n".join(urls) + "\n")
 
     binary = cfg.tool_path("eyewitness") if hasattr(cfg, "tool_path") else "eyewitness"
-    args = ["-f", urls_file, "-d", out_dir, "--no-prompt"]
+    args = ["-f", urls_file, "-d", out_dir, "--no-prompt"] + cfg.extra_args("eyewitness")
 
     try:
         proc = subprocess.run([binary, *args], capture_output=True, text=True, timeout=timeout)

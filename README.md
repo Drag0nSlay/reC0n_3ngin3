@@ -85,13 +85,14 @@ python main.py --config config/settings.yaml --tier 1
 
 ## 📂 What you get
 
-After a run, check:
+Output is **domain-scoped** — running the pipeline against a different
+`target.domain` never overwrites another target's results:
 
 ```
-data/processed/FINAL_REPORT.txt     ← start here: counts + HIGH/MEDIUM/LOW targets + issues
-data/processed/MASTER_REPORT.md     ← full detail, section per phase
-data/processed/master_report.json   ← same, machine-readable
-data/processed/recon.sqlite3        ← everything stored — reruns auto-diff against past scans
+data/processed/<domain>/FINAL_REPORT.txt     ← start here: counts + HIGH/MEDIUM/LOW targets + issues
+data/processed/<domain>/MASTER_REPORT.md     ← full detail, section per phase
+data/processed/<domain>/master_report.json   ← same, machine-readable
+data/processed/recon.sqlite3                 ← shared across all domains — reruns auto-diff against past scans
 ```
 
 Regenerate the report anytime without rerunning the pipeline:
@@ -118,6 +119,31 @@ and heavy fuzzing are deliberately **not** — nuclei is capped to
 info/low severity + non-intrusive tags, masscan needs a second explicit
 confirmation, and directory bruteforcing only ever runs against a
 curated high-priority host list.*
+
+## 🆕 Recently added
+
+- **`extra_args` escape hatch** — every tool wrapper (all 19 CLI tools)
+  now accepts custom flags via `settings.yaml`:
+  ```yaml
+  extra_args:
+    nmap: ["-T4", "--script=vuln"]
+    nuclei: ["-tags", "cve,exposure"]
+    subfinder: ["-recursive"]
+  ```
+  Covers subcommands/flags this project doesn't wire up individually
+  (nmap `--script`, nuclei `-tags`, subfinder `-recursive`, ffuf `-mc`,
+  etc.) without needing a code change per flag. Empty by default — you
+  are responsible for staying within your authorized scope with
+  anything you add here.
+- **`amass intel -org`** — organization-wide ASN/netblock discovery via
+  WHOIS (set `target.org_name` in config). Written to a separate
+  `org_intel.txt` — surfaces leads, not confirmed subdomains, so it's
+  never auto-merged into the main results.
+- **`naabu -passive`** — port data from Shodan's free InternetDB API,
+  zero packets sent to the target. Runs alongside the active naabu
+  sweep in Phase 3 as a free extra signal.
+- **`httpx -favicon`** — mmh3 favicon hash on every live host, useful
+  for Shodan/Censys favicon-based infrastructure pivoting.
 
 ## 🛠️ Tools this wraps
 

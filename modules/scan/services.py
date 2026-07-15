@@ -106,9 +106,9 @@ def nmap_service_scan(cfg: Config, hosts: List[str], ports: str | None = None,
     scanned: list[str] = []
 
     for host in hosts:
-        args = ["-sV", "-sC", "-oN", "-", "-oX", "-", host]
+        args = ["-sV", "-sC", "-oN", "-", "-oX", "-", host] + cfg.extra_args("nmap")
         if ports:
-            args = ["-sV", "-sC", "-p", ports, "-oN", "-", "-oX", "-", host]
+            args = ["-sV", "-sC", "-p", ports, "-oN", "-", "-oX", "-", host] + cfg.extra_args("nmap")
 
         try:
             proc = subprocess.run(

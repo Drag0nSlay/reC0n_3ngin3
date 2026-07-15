@@ -26,28 +26,28 @@ from utils.logger import setup_logging, get_logger
 log = get_logger("output.report")
 
 
-# (relative path under processed_dir unless noted, friendly label, phase)
+# (filename, friendly label, phase, base_dir — "raw" or "processed")
 FILES = [
-    ("../raw/all_subdomains_raw.txt", "Passive subdomains (raw)", "Phase 1"),
-    ("final_subdomains.txt", "Final subdomains", "Phase 1"),
-    ("../raw/cidr.txt", "CIDR ranges", "Phase 1"),
-    ("../raw/ips.txt", "Expanded IPs", "Phase 1"),
-    ("resolved_hosts_only.txt", "Resolved hosts", "Phase 2"),
-    ("live_domains.txt", "Live hosts (httpx)", "Phase 2"),
-    ("ports.txt", "Open host:port pairs", "Phase 3"),
-    ("services.txt", "Service enumeration (nmap)", "Phase 3"),
-    ("final_urls.txt", "All discovered URLs", "Phase 4"),
-    ("js_files.txt", "JS files", "Phase 5"),
-    ("endpoints.txt", "Discovered endpoints", "Phase 5"),
-    ("secrets.txt", "Secrets found (redacted)", "Phase 5"),
-    ("github_secrets.txt", "GitHub leakage findings", "Phase 5"),
-    ("waf.txt", "WAF detections", "Phase 6"),
-    ("nuclei.txt", "nuclei findings (safe templates)", "Phase 6"),
-    ("interesting_params.txt", "gf pattern matches", "Phase 6"),
-    ("takeover.txt", "Subdomain takeover flags", "Phase 6"),
-    ("dirs.txt", "Directory bruteforce hits", "Phase 7"),
-    ("buckets.txt", "Cloud bucket findings", "Phase 8"),
-    ("dns_full.txt", "Deep DNS output", "Phase 9"),
+    ("all_subdomains_raw.txt", "Passive subdomains (raw)", "Phase 1", "raw"),
+    ("final_subdomains.txt", "Final subdomains", "Phase 1", "processed"),
+    ("cidr.txt", "CIDR ranges", "Phase 1", "raw"),
+    ("ips.txt", "Expanded IPs", "Phase 1", "raw"),
+    ("resolved_hosts_only.txt", "Resolved hosts", "Phase 2", "processed"),
+    ("live_domains.txt", "Live hosts (httpx)", "Phase 2", "processed"),
+    ("ports.txt", "Open host:port pairs", "Phase 3", "processed"),
+    ("services.txt", "Service enumeration (nmap)", "Phase 3", "processed"),
+    ("final_urls.txt", "All discovered URLs", "Phase 4", "processed"),
+    ("js_files.txt", "JS files", "Phase 5", "processed"),
+    ("endpoints.txt", "Discovered endpoints", "Phase 5", "processed"),
+    ("secrets.txt", "Secrets found (redacted)", "Phase 5", "processed"),
+    ("github_secrets.txt", "GitHub leakage findings", "Phase 5", "processed"),
+    ("waf.txt", "WAF detections", "Phase 6", "processed"),
+    ("nuclei.txt", "nuclei findings (safe templates)", "Phase 6", "processed"),
+    ("interesting_params.txt", "gf pattern matches", "Phase 6", "processed"),
+    ("takeover.txt", "Subdomain takeover flags", "Phase 6", "processed"),
+    ("dirs.txt", "Directory bruteforce hits", "Phase 7", "processed"),
+    ("buckets.txt", "Cloud bucket findings", "Phase 8", "processed"),
+    ("dns_full.txt", "Deep DNS output", "Phase 9", "processed"),
 ]
 
 # Files whose presence (non-empty) signals something worth a human's
@@ -92,10 +92,11 @@ def generate_master_report(cfg: Config) -> dict:
         "sections": {},
     }
 
-    for rel_path, label, phase in FILES:
-        full_path = os.path.join(cfg.processed_dir, rel_path)
+    for fname, label, phase, base in FILES:
+        base_dir = cfg.raw_dir if base == "raw" else cfg.processed_dir
+        full_path = os.path.join(base_dir, fname)
         lines = _read_lines(full_path)
-        report["sections"][rel_path.split("/")[-1]] = {
+        report["sections"][fname] = {
             "label": label,
             "phase": phase,
             "count": len(lines),
@@ -246,7 +247,7 @@ def _write_markdown_report(cfg: Config, report: dict) -> None:
 
 
 def main():
-    p = argparse.ArgumentParser(description="Combine all reC0n_3ngin3 phase outputs into one report")
+    p = argparse.ArgumentParser(description="Combine all recon-engine phase outputs into one report")
     p.add_argument("--config", default="config/settings.yaml")
     args = p.parse_args()
 

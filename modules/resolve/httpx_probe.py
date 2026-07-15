@@ -46,7 +46,8 @@ def probe_alive(cfg: Config, hosts: Set[str]) -> dict:
         "-title",
         "-tech-detect",
         "-follow-redirects",
-    ]
+        "-favicon",  # mmh3 hash of /favicon.ico — enables Shodan/Censys favicon pivoting
+    ] + cfg.extra_args("httpx")
 
     try:
         proc = subprocess.run(

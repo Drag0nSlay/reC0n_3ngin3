@@ -36,7 +36,7 @@ def katana_crawl(cfg: Config, live_urls: Iterable[str], depth: int = 3) -> Set[s
         return set()
 
     binary = cfg.tool_path("katana")
-    args = ["-silent", "-depth", str(depth), "-jc"]  # -jc: also parse JS files for endpoints
+    args = ["-silent", "-depth", str(depth), "-jc"] + cfg.extra_args("katana")  # -jc: also parse JS files for endpoints
     out = _run_cli(binary, args, stdin_data="\n".join(live_urls), timeout=1200)
 
     result = dedupe_lines(out.splitlines(), normalize=False)

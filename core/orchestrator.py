@@ -12,7 +12,7 @@ import os
 from core.config import Config
 from core.storage import Storage
 from utils.logger import setup_logging, get_logger
-from modules.enum import passive_sources, asn_ip, brute, deep_dns
+from modules.enum import passive_sources, asn_ip, brute, deep_dns, recursive_enum, permutation
 from modules.resolve import dnsx, httpx_probe
 from modules.scan import ports, services, nuclei_scan, takeover
 from modules.crawl import historical_urls, live_crawl
@@ -44,7 +44,8 @@ TIER_PHASES = {
 }
 
 
-def run_phase1(cfg: Config, wordlist_path: str | None = None) -> dict:
+def run_phase1(cfg: Config, wordlist_path: str | None = None, enable_permutation: bool = True,
+               enable_recursion: bool = True) -> dict:
     os.makedirs(cfg.raw_dir, exist_ok=True)
     os.makedirs(cfg.processed_dir, exist_ok=True)
 
@@ -55,24 +56,52 @@ def run_phase1(cfg: Config, wordlist_path: str | None = None) -> dict:
     log.info("Step 1/3: passive base asset collection")
     base_domains = passive_sources.run_all_passive(cfg)
 
+    # Step 1a — org-wide intel (supplementary, NOT merged into base_domains —
+    # amass intel -org surfaces ASNs/netblocks/whois hits, not confirmed
+    # subdomains, so it's written to its own file for manual review/pivoting)
+    log.info("Step 1a: organization-wide ASN/netblock intel (amass intel -org)")
+    passive_sources.amass_intel_org(cfg)
+
+    # Step 1b — recursive enumeration: re-run fast passive sources against
+    # a curated subset of already-discovered subdomains that look like
+    # they might have their own sub-tree. Same trust level as base_domains
+    # (still passive lookups, just a different root) — merged directly,
+    # no DNS verification needed since no guessing is involved here.
+    recursive_domains: set = set()
+    if enable_recursion:
+        log.info("Step 1b: recursive enumeration on curated sub-roots")
+        recursive_domains = recursive_enum.run_recursive_enumeration(cfg, base_domains)
+        base_domains = base_domains | recursive_domains
+
     # Step 2 — ASN + IP mapping (also passive/public registry data)
     log.info("Step 2/3: ASN + IP mapping")
     asn_ip_data = asn_ip.run_asn_ip_stage(cfg)
 
     # Step 3 — brute expansion (semi-active: DNS queries against target's
     # nameservers). Gated on cfg.authorized inside brute.shuffledns_brute.
+    # Permutation candidates are merged into the same wordlist so they go
+    # through the exact same DNS-verification step as a user-supplied
+    # wordlist — no unverified guesses ever reach final_subdomains.txt.
+    permutation_wordlist_path = None
+    if enable_permutation:
+        log.info("Step 3a: generating permutation candidates from known subdomain keywords")
+        labels = permutation.generate_permutation_labels(cfg, base_domains)
+        permutation_wordlist_path = permutation.write_permutation_wordlist(cfg, labels)
+
     brute_domains = set()
-    if wordlist_path:
-        log.info("Step 3/3: brute-force DNS expansion")
-        brute_domains = brute.shuffledns_brute(cfg, wordlist_path)
+    combined_wordlist = brute.combine_wordlists(cfg, wordlist_path, permutation_wordlist_path)
+    if combined_wordlist:
+        log.info("Step 3b: brute-force DNS expansion (user wordlist + permutation candidates)")
+        brute_domains = brute.shuffledns_brute(cfg, combined_wordlist)
     else:
-        log.info("Step 3/3: skipped (no --wordlist provided)")
+        log.info("Step 3b: skipped (no --wordlist provided and permutation disabled/empty)")
 
     final = brute.merge_final(cfg, base_domains, brute_domains)
 
     log.info("=== PHASE 1 COMPLETE ===")
-    log.info(f"  base (passive):     {len(base_domains)}")
-    log.info(f"  brute (active DNS): {len(brute_domains)}")
+    log.info(f"  base (passive):      {len(base_domains) - len(recursive_domains)}")
+    log.info(f"  recursive (passive): {len(recursive_domains)}")
+    log.info(f"  brute (active DNS, incl. permutation hits): {len(brute_domains)}")
     log.info(f"  ASN handles:        {len(asn_ip_data.get('asn', []))}")
     log.info(f"  CIDR ranges:        {len(asn_ip_data.get('cidr', []))}")
     log.info(f"  IPs expanded:       {len(asn_ip_data.get('ips', []))}")

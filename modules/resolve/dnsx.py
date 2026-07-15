@@ -66,7 +66,7 @@ def resolve_domains(cfg: Config, domains: Set[str]) -> dict:
     binary = cfg.tool_path("dnsx") if hasattr(cfg, "tool_path") else "dnsx"
     stdin_data = "\n".join(sorted(domains))
 
-    args = ["-silent", "-resp", "-wd", cfg.domain]  # -wd = wildcard filter against root domain
+    args = ["-silent", "-resp", "-wd", cfg.domain] + cfg.extra_args("dnsx")  # -wd = wildcard filter against root domain
     out = _run_cli(binary, args, stdin_data)
 
     raw_lines = [l for l in out.splitlines() if l.strip()]
