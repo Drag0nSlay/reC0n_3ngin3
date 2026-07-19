@@ -18,6 +18,7 @@ from typing import List
 
 from utils.logger import get_logger
 from core.config import Config
+from modules.enum.passive_sources import _detect_amass_version, _diagnose_amass_error
 
 log = get_logger("enum.deep_dns")
 
@@ -58,12 +59,13 @@ def amass_active(cfg: Config, timeout: int = 1800) -> str:
         return ""
 
     binary = cfg.tool_path("amass") if hasattr(cfg, "tool_path") else "amass"
+    version = _detect_amass_version(binary)
     args = ["enum", "-active", "-d", cfg.domain] + cfg.extra_args("amass")
 
     try:
         proc = subprocess.run([binary, *args], capture_output=True, text=True, timeout=timeout)
         if proc.returncode != 0:
-            log.warning(f"amass active exited {proc.returncode}: {proc.stderr.strip()[:300]}")
+            _diagnose_amass_error(proc.stderr, binary)
         return proc.stdout
     except FileNotFoundError:
         log.info("amass: not installed, skipping active enum")

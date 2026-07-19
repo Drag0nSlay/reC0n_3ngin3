@@ -161,6 +161,69 @@ def github_subdomains(cfg: Config, domain: str | None = None, prefix: str = "") 
     return out
 
 
+# -------------------------------------------------------- amass helpers ----
+_amass_version_cache: dict = {}
+
+
+def _detect_amass_version(binary: str) -> str | None:
+    """Detect amass major version (returns '3', '4', or None on failure).
+
+    Caches the result per binary path so we only shell out once per run.
+    amass v3: `amass -version` prints "v3.x.x"
+    amass v4 (OWASP fork): `amass -version` or `amass --version` prints
+    something containing "v4" or "OWASP Amass v4".
+    """
+    if binary in _amass_version_cache:
+        return _amass_version_cache[binary]
+
+    version = None
+    for flag in ["-version", "--version", "version"]:
+        try:
+            proc = subprocess.run(
+                [binary, flag], capture_output=True, text=True, timeout=10
+            )
+            combined = (proc.stdout + proc.stderr).lower()
+            if "v4" in combined or "owasp" in combined:
+                version = "4"
+                break
+            elif "v3" in combined or "amass v" in combined:
+                version = "3"
+                break
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            break
+
+    _amass_version_cache[binary] = version
+    if version:
+        log.info(f"amass version detected: v{version}")
+    return version
+
+
+def _diagnose_amass_error(stderr: str, binary: str) -> None:
+    """Parse common amass error patterns and log actionable diagnostics."""
+    stderr_lower = stderr.lower()
+
+    if "datasources" in stderr_lower or "config" in stderr_lower:
+        log.warning(
+            f"{binary}: amass config/datasources issue detected. "
+            "If you're on amass v4 (OWASP), it expects a datasources.yaml "
+            "file (not the old config.ini). See: "
+            "https://github.com/owasp-amass/amass/blob/master/examples/datasources.yaml"
+        )
+    elif "nonetype" in stderr_lower or "not iterable" in stderr_lower:
+        log.warning(
+            f"{binary}: amass returned a NoneType/iteration error — this usually "
+            "means a data source returned no results or the API response was empty. "
+            "Not a bug in reC0n_3ngin3 — amass's internal error handling surfaced it."
+        )
+    elif "timeout" in stderr_lower or "deadline" in stderr_lower:
+        log.warning(
+            f"{binary}: amass hit a timeout or deadline. Consider increasing the "
+            "timeout or reducing the scope."
+        )
+    elif stderr.strip():
+        log.warning(f"{binary} stderr: {stderr.strip()[:500]}")
+
+
 # ---------------------------------------------------------- CLI wrappers ----
 def _run_cli(binary: str, args: list[str], timeout: int = 120) -> str:
     try:
@@ -199,7 +262,26 @@ def assetfinder(cfg: Config, domain: str | None = None, prefix: str = "") -> Set
 def amass_passive(cfg: Config, domain: str | None = None, prefix: str = "") -> Set[str]:
     domain = domain or cfg.domain
     binary = cfg.tool_path("amass")
-    out = _run_cli(binary, ["enum", "-passive", "-d", domain] + cfg.extra_args("amass"), timeout=300)
+
+    # Detect version for diagnostics (does not change passive-mode args —
+    # `amass enum -passive -d <domain>` works on both v3 and v4)
+    version = _detect_amass_version(binary)
+
+    try:
+        proc = subprocess.run(
+            [binary, "enum", "-passive", "-d", domain] + cfg.extra_args("amass"),
+            capture_output=True, text=True, timeout=600,  # amass is notoriously slow
+        )
+        if proc.returncode != 0:
+            _diagnose_amass_error(proc.stderr, binary)
+        out = proc.stdout
+    except FileNotFoundError:
+        log.info(f"{binary}: not installed / not on PATH, skipping")
+        out = ""
+    except subprocess.TimeoutExpired:
+        log.warning(f"{binary} enum -passive: timed out after 600s")
+        out = ""
+
     result = dedupe_lines(out.splitlines())
     _write_raw(cfg, "amass", result, prefix)
     return result
@@ -225,7 +307,23 @@ def amass_intel_org(cfg: Config, org_name: str | None = None) -> Set[str]:
     """
     org_name = org_name or cfg.org_name or cfg.domain.split(".")[0]
     binary = cfg.tool_path("amass")
-    out = _run_cli(binary, ["intel", "-org", org_name] + cfg.extra_args("amass"), timeout=300)
+
+    version = _detect_amass_version(binary)
+
+    try:
+        proc = subprocess.run(
+            [binary, "intel", "-org", org_name] + cfg.extra_args("amass"),
+            capture_output=True, text=True, timeout=600,
+        )
+        if proc.returncode != 0:
+            _diagnose_amass_error(proc.stderr, binary)
+        out = proc.stdout
+    except FileNotFoundError:
+        log.info(f"{binary}: not installed / not on PATH, skipping amass intel")
+        out = ""
+    except subprocess.TimeoutExpired:
+        log.warning(f"{binary} intel -org: timed out after 600s")
+        out = ""
 
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     result = set(lines)

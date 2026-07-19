@@ -1,8 +1,25 @@
 #!/usr/bin/env python3
 """
-main.py — reC0n_3ngin3 entrypoint (Phases 1-14 implemented).
+main.py — reC0n_3ngin3 entrypoint.
 
-Primary interface — tiered execution (Phase 14, recommended):
+Unified subcommand interface (recommended):
+    python main.py enum -d example.com              # passive subdomain enum
+    python main.py intel -d example.com             # org-wide infra intel
+    python main.py subdomain -d example.com         # full Phase 1 pipeline
+    python main.py resolve -d example.com           # DNS resolution + alive
+    python main.py scan -d example.com              # port scan + service enum
+    python main.py crawl -d example.com             # URL collection
+    python main.py secrets -d example.com           # JS + secret analysis
+    python main.py vuln -d example.com              # nuclei + takeover + WAF
+    python main.py discover -d example.com          # dir bruteforce + screenshots
+    python main.py cloud -d example.com             # bucket discovery
+    python main.py dns -d example.com               # dnsrecon + amass active
+    python main.py full -d example.com              # run everything (tier 4)
+
+    Each subcommand automatically runs the equivalent operation across
+    ALL installed recon tools — no need to remember individual tool syntax.
+
+Legacy tiered interface (still fully supported):
     python main.py --config config/settings.yaml --tier 1
     python main.py --config config/settings.yaml --tier 3 --wordlist seclists/subdomains.txt
 
@@ -15,7 +32,7 @@ Primary interface — tiered execution (Phase 14, recommended):
     (SQLite storage + diffing), and Phase 13 (prioritized final report) —
     see data/processed/FINAL_REPORT.txt and MASTER_REPORT.md afterward.
 
-Secondary interface — granular phase control:
+Legacy granular phase control:
     python main.py --config config/settings.yaml --until phase5
     (runs exactly through the named phase, no scoring/storage/report step —
     use this if you're debugging one phase at a time)
@@ -43,108 +60,33 @@ Safety gate:
     engagement scope calls for it.
 """
 
-import argparse
 import sys
 
-from core.config import Config
-from core.orchestrator import (
-    run_pipeline,
-    run_phase1, run_phase2, run_phase3, run_phase4,
-    run_phase5, run_phase6, run_phase7, run_phase8, run_phase9,
-)
-from utils.logger import setup_logging, get_logger
-
-
-def parse_args():
-    p = argparse.ArgumentParser(description="reC0n_3ngin3 — Phases 1-14")
-    p.add_argument("--config", default="config/settings.yaml")
-    p.add_argument("--wordlist", default=None, help="Wordlist for brute-force DNS expansion (Step 3)")
-    p.add_argument("--dir-wordlist", default=None, help="Wordlist for ffuf directory bruteforce (Step 18)")
-    p.add_argument(
-        "--tier", type=int, choices=[1, 2, 3, 4], default=None,
-        help="Tiered execution (Phase 14, recommended). Overrides --until if both are given.",
-    )
-    p.add_argument(
-        "--until",
-        choices=["phase1", "phase2", "phase3", "phase4", "phase5",
-                 "phase6", "phase7", "phase8", "phase9"],
-        default=None,
-        help="Granular: run through exactly this phase, skipping scoring/storage/report.",
-    )
-    return p.parse_args()
+from core.cli import build_parser, dispatch, cmd_pipeline
 
 
 def main():
-    args = parse_args()
-    cfg = Config(args.config)
-    setup_logging(cfg.log_level, cfg.log_file)
-    log = get_logger("main")
+    parser = build_parser()
+    args = parser.parse_args()
 
-    log.info(f"Target domain: {cfg.domain}")
-    log.info(f"Authorized for active steps: {cfg.authorized}")
-
-    if not cfg.authorized:
-        log.warning(
-            "target.authorized is False. Passive OSINT will still run, but "
-            "every active phase (2 onward) will refuse to execute until you "
-            f"set it to true in {args.config}."
-        )
-
-    # Default to the tiered interface unless the caller explicitly asked
-    # for granular --until control.
-    if args.until is None:
-        tier = args.tier or 1
-        try:
-            run_pipeline(cfg, tier=tier, wordlist_path=args.wordlist, dir_wordlist_path=args.dir_wordlist)
-        except Exception as e:
-            log.error(f"Pipeline failed: {e}")
-            sys.exit(1)
+    # ---- Dispatch logic ----
+    # Case 1: explicit subcommand given (enum, intel, subdomain, etc.)
+    if args.subcommand:
+        dispatch(args)
         return
 
-    # Granular mode
-    try:
-        p1 = run_phase1(cfg, wordlist_path=args.wordlist)
+    # Case 2: no subcommand, but legacy --tier or --until flags present
+    #         → route to the pipeline handler for backward compatibility
+    if args.tier is not None or args.until is not None:
+        # Ensure pipeline handler has all the attributes it expects
+        if not hasattr(args, "dir_wordlist"):
+            args.dir_wordlist = getattr(args, "dir_wordlist", None)
+        cmd_pipeline(args)
+        return
 
-        active_phases = ("phase2", "phase3", "phase4", "phase5", "phase6", "phase7", "phase8", "phase9")
-        if args.until in active_phases:
-            if not cfg.authorized:
-                log.error(
-                    f"--until {args.until} requested but target.authorized is False. "
-                    "Stopping after Phase 1 — set target.authorized: true in "
-                    f"{args.config} to enable active resolution/scanning/crawling."
-                )
-                return
-            p2 = run_phase2(cfg, p1["subdomains"])
-
-            p3 = None
-            if args.until in ("phase3", "phase4", "phase5", "phase6", "phase7", "phase8", "phase9"):
-                p3 = run_phase3(cfg, p2["resolved_hosts"], p2["httpx_records"])
-
-            p4 = None
-            if args.until in ("phase4", "phase5", "phase6", "phase7", "phase8", "phase9"):
-                p4 = run_phase4(cfg, p2["live_urls"])
-
-            if args.until in ("phase5", "phase6", "phase7", "phase8", "phase9"):
-                run_phase5(cfg, p4["final_urls"])
-
-            if args.until in ("phase6", "phase7", "phase8", "phase9"):
-                run_phase6(cfg, p4["final_urls"], p2["resolved_hosts"], p3["ports"])
-
-            if args.until in ("phase7", "phase8", "phase9"):
-                hv_hosts = set(p3["high_value_hosts"])
-                high_priority_urls = {u for u in p2["live_urls"]
-                                       if any(h in u for h in hv_hosts)} or p2["live_urls"]
-                run_phase7(cfg, high_priority_urls, wordlist_path=args.dir_wordlist)
-
-            if args.until in ("phase8", "phase9"):
-                run_phase8(cfg)
-
-            if args.until == "phase9":
-                run_phase9(cfg)
-
-    except Exception as e:
-        log.error(f"Pipeline failed: {e}")
-        sys.exit(1)
+    # Case 3: nothing at all → show help
+    parser.print_help()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

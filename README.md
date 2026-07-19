@@ -46,6 +46,46 @@ python main.py --config config/settings.yaml --tier 1   # safe default
 python main.py --config config/settings.yaml --tier 4   # full pipeline
 ```
 
+## 🧰 Subcommands
+
+Instead of remembering individual tool syntax (`amass enum`, `subfinder -d`,
+`nuclei -l`, etc.), use one `main.py` subcommand that runs the equivalent
+operation across **all installed tools** automatically:
+
+```bash
+python main.py enum -d example.com        # passive subdomain enum (all sources)
+python main.py intel -d example.com       # org-wide infrastructure intel
+python main.py subdomain -d example.com   # full subdomain pipeline → final_subdomains.txt
+python main.py resolve -d example.com     # DNS resolution + alive detection
+python main.py scan -d example.com        # port scan + service enumeration
+python main.py crawl -d example.com       # URL collection (historical + live)
+python main.py secrets -d example.com     # JS + secret analysis + GitHub leaks
+python main.py vuln -d example.com        # nuclei + takeover + WAF + gf
+python main.py discover -d example.com    # directory bruteforce + screenshots
+python main.py cloud -d example.com       # S3/bucket discovery
+python main.py dns -d example.com         # deep/active DNS enumeration
+python main.py full -d example.com        # run everything (= --tier 4)
+```
+
+| Subcommand | Tools it runs | Active? |
+|---|---|:---:|
+| `enum` | subfinder, assetfinder, amass passive, crt.sh, VT, Chaos, GitHub | ❌ |
+| `intel` | amass intel -org, ARIN, bgp.he.net, asnmap, Shodan | ❌ |
+| `subdomain` | enum + intel + shuffledns brute + permutation + recursive | ⚠️ Brute step |
+| `resolve` | dnsx, httpx | ✅ |
+| `scan` | naabu, rustscan, nmap -sV -sC | ✅ |
+| `crawl` | waybackurls, gau, katana | ✅ |
+| `secrets` | LinkFinder, SecretFinder, mantra, trufflehog, gitgraber | ✅ |
+| `vuln` | nuclei (safe), subzy, wafw00f, gf | ✅ |
+| `discover` | ffuf/dirsearch, EyeWitness | ✅ |
+| `cloud` | greyhatwarfare, aws s3, lazys3, S3Scanner | ✅ |
+| `dns` | dnsrecon, amass active | ✅ |
+| `full` | Everything above | ✅ |
+
+Every subcommand accepts `-d <domain>` (overrides settings.yaml) and
+`-c <config>` (custom config path). The old `--tier` / `--until` syntax
+still works exactly as before for backward compatibility.
+
 ## 🔒 Authorized use only
 
 > **This tool sends real network traffic from Tier 2 onward.** Only run
@@ -64,7 +104,7 @@ responsible for how you use this tool.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/<your-username>/reC0n_3ngin3.git
+git clone https://github.com/Drag0nSlay/reC0n_3ngin3.git
 cd reC0n_3ngin3
 
 cp config/settings.example.yaml config/settings.yaml
